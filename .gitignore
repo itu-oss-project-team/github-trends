@@ -1,3 +1,9 @@
+# Secret configuration file
+config_secret.yaml
+
+#Outputs folder
+outputs/
+
 # Created by .ignore support plugin (hsz.mobi)
 ### Windows template
 # Windows thumbnail cache files
@@ -179,4 +185,3 @@ ENV/
 
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
-
