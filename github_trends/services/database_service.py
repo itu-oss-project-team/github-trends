@@ -53,7 +53,7 @@ class DatabaseService:
         commit_data = [(repo_id, k, v) for (k, v) in date_commit_dict.items()]
 
         query = ''' INSERT INTO daily_repo_commits (repo_id, date, commit_count) 
-                    VALUES ( %s, %s, %s, %s ) '''
+                    VALUES (%s, %s, %s ) '''
 
         self.__executemany_insert_query(query, commit_data)
 
@@ -63,7 +63,7 @@ class DatabaseService:
                       date_issue_dict.items()]
 
         query = ''' INSERT INTO daily_repo_issues (repo_id, date, opened, closed, average_duration) 
-                    VALUES ( %s, %s, %s, %s, %s, %s) '''
+                    VALUES (%s, %s, %s, %s, %s) '''
 
         self.__executemany_insert_query(query, issue_data)
 
@@ -72,7 +72,7 @@ class DatabaseService:
         star_data = [(repo_id, k, v) for (k, v) in date_star_dict.items()]
 
         query = ''' INSERT INTO daily_repo_stars (repo_id, date, star_count) 
-                    VALUES ( %s, %s, %s, %s ) '''
+                    VALUES (%s, %s, %s ) '''
 
         self.__executemany_insert_query(query, star_data)
 
@@ -81,9 +81,11 @@ class DatabaseService:
         fork_data = [(repo_id, k, v) for (k, v) in date_fork_dict.items()]
 
         query = ''' INSERT INTO daily_repo_forks (repo_id, date, fork_count) 
-                    VALUES ( %s, %s, %s, %s ) '''
+                    VALUES (%s, %s, %s ) '''
 
         self.__executemany_insert_query(query, fork_data)
+
+
 
     def save_categories_and_repos(self):
         categories = category_repos.keys()
