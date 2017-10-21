@@ -1,6 +1,6 @@
 import requests
 import datetime
-import collections
+from collections import defaultdict, OrderedDict
 
 from github_trends import secret_config
 from github_trends.services.database_service import DatabaseService
@@ -64,7 +64,7 @@ class CommitFetcher:
         return commit_list, last_cursor
 
     def __calculate_daily_results(self, commit_list):
-        date_commit_dict = collections.OrderedDict()
+        date_commit_dict = OrderedDict()
 
         for edge in commit_list:
             date = datetime.datetime.strptime(edge["node"]["committedDate"], "%Y-%m-%dT%H:%M:%SZ").date()
@@ -75,6 +75,20 @@ class CommitFetcher:
                 date_commit_dict[date] += 1
 
         return date_commit_dict
+
+    def __get_users_and_contributions(self, commit_list):
+        contribution_dict = defaultdict(lambda: defaultdict(int))  # {date:<user_login>:int}}
+        for edge in commit_list:
+            try:
+                user_login = edge["node"]["author"]["user"]["login"]
+                date = datetime.datetime.strptime(edge["node"]["committedDate"], "%Y-%m-%dT%H:%M:%SZ").date()
+
+                contribution_dict[date][user_login] += 1
+            except:
+                print('Error in getting commit date and contribution information!')
+                pass
+
+        return contribution_dict
 
     def fetch_and_save_commits_of_repo(self, owner, name):
         print("[" + str(datetime.datetime.now()) + "]: Calculating daily commits of repo " +

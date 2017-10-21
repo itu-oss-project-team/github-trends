@@ -8,53 +8,79 @@ class DatabaseService:
     def __init__(self):
         self.__mysql_config = secret_config['mysql']
 
-    def __executemany_insert_query(self, query, data):
+    def __get_connection(self):
         mysql_config = self.__mysql_config
         conn = pymysql.connect(host=mysql_config['host'], port=mysql_config['port'], db=mysql_config['db'],
-                               user=mysql_config['user'], passwd=mysql_config['passwd'], charset='utf8mb4',
-                               use_unicode=True)
+                                    user=mysql_config['user'], passwd=mysql_config['passwd'], charset='utf8mb4',
+                                    use_unicode=True)
+        return conn
 
+    def __executemany_insert_query(self, query, data):
+        conn = self.__get_connection()
         dict_cursor = conn.cursor(pymysql.cursors.DictCursor)
+
         dict_cursor.executemany(query, data)
         conn.commit()
         dict_cursor.close()
 
     def __insert_query(self, query, data):
-        mysql_config = self.__mysql_config
-        conn = pymysql.connect(host=mysql_config['host'], port=mysql_config['port'], db=mysql_config['db'],
-                               user=mysql_config['user'], passwd=mysql_config['passwd'], charset='utf8mb4',
-                               use_unicode=True)
-
+        conn = self.__get_connection()
         dict_cursor = conn.cursor(pymysql.cursors.DictCursor)
+
         dict_cursor.execute(query, data)
         conn.commit()
         dict_cursor.close()
 
+    def __execute_select_query(self, query, data):
+        conn = self.__get_connection()
+        dict_cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+        dict_cursor.execute(query, data)
+        values = dict_cursor.fetchall()
+        dict_cursor.close()
+        return values
+
+    def get_repo_id_by_name_and_owner(self, owner,name):
+        query = '''Select id from repos
+                   WHERE owner = %s and name = %s
+                '''
+
+        repo_id_list = self.__execute_select_query(query, (owner, name))
+        return repo_id_list[0]["id"]
+
     def save_daily_commits_of_repo(self, owner, name, date_commit_dict):
-        commit_data = [(owner, name, k, v) for (k, v) in date_commit_dict.items()]
-        query = ''' INSERT INTO daily_repo_commits (repo_owner, repo_name, date, commit_count) 
+        repo_id = self.get_repo_id_by_name_and_owner(owner, name)
+        commit_data = [(repo_id, k, v) for (k, v) in date_commit_dict.items()]
+
+        query = ''' INSERT INTO daily_repo_commits (repo_id, date, commit_count) 
                     VALUES ( %s, %s, %s, %s ) '''
 
         self.__executemany_insert_query(query, commit_data)
 
     def save_daily_issues_of_repo(self, owner, name, date_issue_dict):
-        issue_data = [(owner, name, k, v["opened"], v["closed"], v["avg_duration"]) for (k, v) in
+        repo_id = self.get_repo_id_by_name_and_owner(owner, name)
+        issue_data = [(repo_id, k, v["opened"], v["closed"], v["avg_duration"]) for (k, v) in
                       date_issue_dict.items()]
-        query = ''' INSERT INTO daily_repo_issues (repo_owner, repo_name, date, opened, closed, average_duration) 
+
+        query = ''' INSERT INTO daily_repo_issues (repo_id, date, opened, closed, average_duration) 
                     VALUES ( %s, %s, %s, %s, %s, %s) '''
 
         self.__executemany_insert_query(query, issue_data)
 
     def save_daily_stars_of_repo(self, owner, name, date_star_dict):
-        star_data = [(owner, name, k, v) for (k, v) in date_star_dict.items()]
-        query = ''' INSERT INTO daily_repo_stars (repo_owner, repo_name, date, star_count) 
+        repo_id = self.get_repo_id_by_name_and_owner(owner, name)
+        star_data = [(repo_id, k, v) for (k, v) in date_star_dict.items()]
+
+        query = ''' INSERT INTO daily_repo_stars (repo_id, date, star_count) 
                     VALUES ( %s, %s, %s, %s ) '''
 
         self.__executemany_insert_query(query, star_data)
 
     def save_daily_forks_of_repo(self, owner, name, date_fork_dict):
-        fork_data = [(owner, name, k, v) for (k, v) in date_fork_dict.items()]
-        query = ''' INSERT INTO daily_repo_forks (repo_owner, repo_name, date, fork_count) 
+        repo_id = self.get_repo_id_by_name_and_owner(owner, name)
+        fork_data = [(repo_id, k, v) for (k, v) in date_fork_dict.items()]
+
+        query = ''' INSERT INTO daily_repo_forks (repo_id, date, fork_count) 
                     VALUES ( %s, %s, %s, %s ) '''
 
         self.__executemany_insert_query(query, fork_data)
