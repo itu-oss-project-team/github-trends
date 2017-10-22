@@ -85,7 +85,14 @@ class DatabaseService:
 
         self.__executemany_insert_query(query, fork_data)
 
+    def save_daily_contributions_of_repo(self, owner, name, date_user_contribution_dict):
+        repo_id = self.get_repo_id_by_name_and_owner(owner, name)
+        contribution_data = [(repo_id, u, d, c) for d, v in date_user_contribution_dict.items() for u, c in v.items()]
 
+        query = ''' INSERT INTO daily_repo_contributions (repo_id, login, date, commit_count) 
+                    VALUES (%s, %s, %s, %s ) '''
+
+        self.__executemany_insert_query(query, contribution_data)
 
     def save_categories_and_repos(self):
         categories = category_repos.keys()

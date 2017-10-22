@@ -96,8 +96,10 @@ class CommitFetcher:
 
         commit_list, last_cursor = self.__fetch_commits_of_repo(owner, name)
         date_commit_dict = self.__calculate_daily_results(commit_list)
+        date_user_contribution_dict = self.__get_users_and_contributions(commit_list)
 
         self.db_service.save_daily_commits_of_repo(owner, name, date_commit_dict)
+        self.db_service.save_daily_contributions_of_repo(owner, name, date_user_contribution_dict)
 
         print("[" + str(datetime.datetime.now()) + "]: Calculating daily commits of repo " +
               owner + "/" + name + " ended.")
