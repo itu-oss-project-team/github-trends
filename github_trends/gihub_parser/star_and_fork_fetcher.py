@@ -14,8 +14,8 @@ class StarAndForkFetcher:
         token = secret_config["github-api"]["tokens"][0]
         self.headers = {'Authorization': 'token ' + token}
 
-
     def __fetch_stars_of_repo(self, owner, name):
+
         query = '''
                 query($owner:String!, $name:String!, $after:String){
                   repository(owner: $owner, name: $name) {
@@ -46,16 +46,19 @@ class StarAndForkFetcher:
         variables = {"owner": owner, "name": name, "after": None}
         stargazer_list = []
         while True:
-            r = requests.post(self.api_url, headers=self.headers, json={'query': query, 'variables': variables})
-            result_json = r.json()
-            field_dict = result_json["data"]["repository"]["stargazers"]
-            after_cursor = field_dict["pageInfo"]["endCursor"]
-            variables["after"] = after_cursor
-            stargazer_list.extend(field_dict["edges"])
+            try:
+                r = requests.post(self.api_url, headers=self.headers, json={'query': query, 'variables': variables})
+                result_json = r.json()
+                field_dict = result_json["data"]["repository"]["stargazers"]
+                after_cursor = field_dict["pageInfo"]["endCursor"]
+                variables["after"] = after_cursor
+                stargazer_list.extend(field_dict["edges"])
 
-            if not field_dict["pageInfo"]["hasNextPage"]:
-                last_cursor = after_cursor
-                break
+                if not field_dict["pageInfo"]["hasNextPage"]:
+                    last_cursor = after_cursor
+                    break
+            except:
+                print("Error in star request")
 
         return stargazer_list, last_cursor
 
@@ -91,16 +94,19 @@ class StarAndForkFetcher:
         variables = {"owner": owner, "name": name, "after": None}
         forks_list = []
         while True:
-            r = requests.post(self.api_url, headers=self.headers, json={'query': query, 'variables': variables})
-            result_json = r.json()
-            field_dict = result_json["data"]["repository"]["forks"]
-            after_cursor = field_dict["pageInfo"]["endCursor"]
-            variables["after"] = after_cursor
-            forks_list.extend(field_dict["edges"])
+            try:
+                r = requests.post(self.api_url, headers=self.headers, json={'query': query, 'variables': variables})
+                result_json = r.json()
+                field_dict = result_json["data"]["repository"]["forks"]
+                after_cursor = field_dict["pageInfo"]["endCursor"]
+                variables["after"] = after_cursor
+                forks_list.extend(field_dict["edges"])
 
-            if not field_dict["pageInfo"]["hasNextPage"]:
-                last_cursor = after_cursor
-                break
+                if not field_dict["pageInfo"]["hasNextPage"]:
+                    last_cursor = after_cursor
+                    break
+            except:
+                print("Error in fork request")
 
         return forks_list, last_cursor
 

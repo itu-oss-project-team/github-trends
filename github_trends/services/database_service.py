@@ -57,22 +57,29 @@ class DatabaseService:
 
         self.__executemany_insert_query(query, commit_data)
 
-    def save_daily_issues_of_repo(self, owner, name, date_issue_dict):
+    def save_daily_issues_of_repo(self, owner, name, date_issue_dict, date_user_dict):
         repo_id = self.get_repo_id_by_name_and_owner(owner, name)
-        issue_data = [(repo_id, k, v["opened"], v["closed"], v["avg_duration"]) for (k, v) in
-                      date_issue_dict.items()]
 
-        query = ''' INSERT INTO daily_repo_issues (repo_id, date, opened, closed, average_duration) 
-                    VALUES (%s, %s, %s, %s, %s) '''
+        issue_data = [(repo_id, date, issue["opened"], issue["closed"], issue["avg_duration"])
+                      for (date, issue) in date_issue_dict.items()]
+        date_issue_query = ''' INSERT INTO daily_repo_issues (repo_id, date, opened_count, closed_count, avg_resolution_sec) 
+                    VALUES ( %s, %s, %s, %s, %s) '''
+        self.__executemany_insert_query(date_issue_query, issue_data)
 
-        self.__executemany_insert_query(query, issue_data)
+        user_data = [(repo_id, login, date, user["opened"], user["closed"])
+                     for (date, user_dict) in date_user_dict.items()
+                     for (login, user) in user_dict.items()
+                     if login is not None]
+        date_user_query = ''' INSERT INTO daily_repo_issue_activities (repo_id, login, date, open_count, closed_count) 
+                    VALUES ( %s, %s, %s, %s, %s) '''
+        self.__executemany_insert_query(date_user_query, user_data)
 
     def save_daily_stars_of_repo(self, owner, name, date_star_dict):
         repo_id = self.get_repo_id_by_name_and_owner(owner, name)
         star_data = [(repo_id, k, v) for (k, v) in date_star_dict.items()]
 
         query = ''' INSERT INTO daily_repo_stars (repo_id, date, star_count) 
-                    VALUES (%s, %s, %s ) '''
+                    VALUES ( %s, %s, %s) '''
 
         self.__executemany_insert_query(query, star_data)
 
