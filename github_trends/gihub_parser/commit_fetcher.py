@@ -7,8 +7,9 @@ from github_trends.services.database_service import DatabaseService
 
 
 class CommitFetcher:
-    def __init__(self):
+    def __init__(self, context):
         self.db_service = DatabaseService()
+        self.context = context
         self.last_commit_cursor = None
         self.api_url = "https://api.github.com/graphql"
         token = secret_config["github-api"]["tokens"][0]
@@ -95,6 +96,7 @@ class CommitFetcher:
               owner + "/" + name + " started.")
 
         commit_list, last_cursor = self.__fetch_commits_of_repo(owner, name)
+        self.context.AddCommitList(owner + "/" + name, commit_list)
         date_commit_dict = self.__calculate_daily_results(commit_list)
         date_user_contribution_dict = self.__get_users_and_contributions(commit_list)
 

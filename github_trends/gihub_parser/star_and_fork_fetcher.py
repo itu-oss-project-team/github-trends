@@ -7,8 +7,9 @@ from github_trends.services.database_service import DatabaseService
 
 
 class StarAndForkFetcher:
-    def __init__(self):
+    def __init__(self, context):
         self.db_service = DatabaseService()
+        self.context = context
         self.last_commit_cursor = None
         self.api_url = "https://api.github.com/graphql"
         token = secret_config["github-api"]["tokens"][0]
@@ -72,6 +73,7 @@ class StarAndForkFetcher:
                       edges {
                         cursor
                         node {
+                          owner { login }
                           nameWithOwner
                           createdAt
                         }
@@ -114,12 +116,15 @@ class StarAndForkFetcher:
         date_stars_dict = collections.OrderedDict()
 
         for edge in star_list:
-            date = datetime.datetime.strptime(edge["starredAt"], "%Y-%m-%dT%H:%M:%SZ").date()
+            try:
+                date = datetime.datetime.strptime(edge["starredAt"], "%Y-%m-%dT%H:%M:%SZ").date()
 
-            if date not in date_stars_dict:
-                date_stars_dict[date] = 1
-            else:
-                date_stars_dict[date] += 1
+                if date not in date_stars_dict:
+                    date_stars_dict[date] = 1
+                else:
+                    date_stars_dict[date] += 1
+            except:
+                pass
 
         return date_stars_dict
 
@@ -127,12 +132,15 @@ class StarAndForkFetcher:
         date_fork_dict = collections.OrderedDict()
 
         for edge in fork_list:
-            date = datetime.datetime.strptime(edge["node"]["createdAt"], "%Y-%m-%dT%H:%M:%SZ").date()
+            try:
+                date = datetime.datetime.strptime(edge["node"]["createdAt"], "%Y-%m-%dT%H:%M:%SZ").date()
 
-            if date not in date_fork_dict:
-                date_fork_dict[date] = 1
-            else:
-                date_fork_dict[date] += 1
+                if date not in date_fork_dict:
+                    date_fork_dict[date] = 1
+                else:
+                    date_fork_dict[date] += 1
+            except:
+                pass
 
         return date_fork_dict
 
@@ -141,6 +149,7 @@ class StarAndForkFetcher:
               owner + '/' + name + " started.")
 
         star_list, last_cursor = self.__fetch_stars_of_repo(owner, name)
+        self.context.AddStarList(owner + "/" + name, star_list)
         date_stars_dict = self.__calculate_daily_stars(star_list)
 
         self.db_service.save_daily_stars_of_repo(owner, name, date_stars_dict)
@@ -153,6 +162,7 @@ class StarAndForkFetcher:
               owner + '/' + name + " started.")
 
         fork_list, last_cursor = self.__fetch_forks_of_repo(owner, name)
+        self.context.AddForkList(owner + "/" + name, fork_list)
         date_fork_dict = self.__calculate_daily_forks(fork_list)
 
         self.db_service.save_daily_forks_of_repo(owner, name, date_fork_dict)

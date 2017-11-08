@@ -99,7 +99,10 @@ class DatabaseService:
         query = ''' INSERT INTO daily_repo_contributions (repo_id, login, date, commit_count) 
                     VALUES (%s, %s, %s, %s ) '''
 
-        self.__executemany_insert_query(query, contribution_data)
+        try:
+            self.__executemany_insert_query(query, contribution_data)
+        except:
+            pass
 
     def save_categories_and_repos(self):
         categories = category_repos.keys()
@@ -115,3 +118,19 @@ class DatabaseService:
                         VALUES ( %s, %s, %s ) '''
 
             self.__executemany_insert_query(query, filtered_repos)
+
+    def save_developer_stats(self, user_stats_dict):
+        query = ''' INSERT INTO daily_developer_stats(login, date, starred_repo_count, forked_repo_count,
+                    contributed_repo_count, commit_count, opened_issue_count, resolved_issue_count)
+                    VALUES( %s, %s, %s, %s, %s, %s, %s, %s)'''
+
+        user_stats = tuple(user_stats_dict.values())
+
+        self.__insert_query(query, user_stats)
+
+    def get_developers(self):
+        query = ''' SELECT DISTINCT login FROM daily_repo_contributions '''
+
+        developers = self.__execute_select_query(query, None)
+
+        return developers

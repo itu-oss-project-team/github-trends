@@ -9,9 +9,10 @@ from github_trends.services.database_service import DatabaseService
 
 
 class IssueFetcher:
-    def __init__(self):
+    def __init__(self, context):
         self.db_service = DatabaseService()
         self.last_commit_cursor = None
+        self.context = context
         self.api_url = "https://api.github.com/graphql"
         token = secret_config["github-api"]["tokens"][0]
         self.headers = {'Authorization': 'token ' + token}
@@ -22,6 +23,7 @@ class IssueFetcher:
 
         commit_list, last_cursor = self.__fetch_issues_of_repo(owner, name)
         parsed_issues = self.__parse_raw_issues(commit_list)
+        self.context.AddIssueList(owner + "/" + name, parsed_issues)
         date_issue_dict, daily_user_counts = self.__calculate_daily_stats(parsed_issues)
 
         self.db_service.save_daily_issues_of_repo(owner, name, date_issue_dict, daily_user_counts)
