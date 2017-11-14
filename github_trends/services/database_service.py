@@ -282,8 +282,23 @@ class DatabaseService:
                 '''
 
         contribution_list = self.__execute_select_query(query, (login, date, login, date))
-        contribution_dict = OrderedDict(map(lambda x: (x["date"], x["NumberOfContributedRepos "]), contribution_list))
+        contribution_dict = OrderedDict(map(lambda x: (x["date"], x["NumberOfContributedRepos"]), contribution_list))
         return contribution_dict
+
+    def get_number_of_releases_of_a_user(self, login, date):
+        query = '''
+                SELECT
+                    date, 
+                    count(*) as ReleaseCount
+                FROM `releases` R
+                WHERE login = %s and date <= %s
+                group by date, login
+                order by date desc
+                '''
+
+        release_list = self.__execute_select_query(query, (login, date))
+        release_dict = OrderedDict(map(lambda x: (x["date"], x["ReleaseCount"]), release_list))
+        return release_dict
 
 
     
