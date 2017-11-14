@@ -21,7 +21,7 @@ class IssueFetcher:
               owner + "/" + name + " started.")
 
         commit_list, last_cursor = self.__fetch_issues_of_repo(owner, name)
-        parsed_issues = self.__parse_raw_issues(commit_list)
+        parsed_issues = self.__parse_raw_issues(commit_list, owner, name)
         date_issue_dict, daily_user_counts = self.__calculate_daily_stats(parsed_issues)
 
         self.db_service.save_issues(owner, name, parsed_issues)
@@ -47,8 +47,13 @@ class IssueFetcher:
                             login
                           }
                           timeline(last: 100) {
+                           pageInfo {
+                            hasPreviousPage,
+                            startCursor
+                          }
                             totalCount
                             edges {
+                            cursor
                               node() {
                                 ... on ClosedEvent {
                                   __typename
@@ -103,45 +108,127 @@ class IssueFetcher:
 
         return issue_list, last_cursor
 
-    @staticmethod
-    def __parse_raw_issues(issue_list):
+    def __get_closed_date_of_issue(self, owner, name, previous_issues_cursor, timeline):
+        query = '''
+            query ($owner: String!, $name: String!, $afterIssue: String, $beforeEvent:String) {
+                repository(owner: $owner, name: $name) {
+                  issues(first: 1, after: $afterIssue, orderBy: {field: CREATED_AT, direction: ASC}) {
+                    edges {
+                      cursor
+                      node {
+                        number
+                        id
+                        createdAt
+                        updatedAt
+                        closed
+                        state
+                        author {
+                          login
+                        }
+                        timeline(last: 100, before:$beforeEvent) {
+                          pageInfo {
+                            hasPreviousPage,
+                            startCursor
+                          }
+                          totalCount
+                          edges {
+                            cursor
+                            node() {
+                              ... on ClosedEvent {
+                                __typename
+                                createdAt
+                                actor {
+                                  login
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    pageInfo {
+                      startCursor
+                      hasPreviousPage
+                      endCursor
+                      hasNextPage
+                    }
+                  }
+                }
+                rateLimit {
+                  limit
+                  cost
+                  remaining
+                  resetAt
+                }
+              }
+        '''
+        while True:
+            for event in timeline['edges']:
+                if '__typename' not in event['node']:
+                    continue
+                event_type = event['node']['__typename']
+                if event_type == "ClosedEvent":
+                    closed_date = datetime.datetime.strptime(event['node']['createdAt'], '%Y-%m-%dT%H:%M:%SZ')
+                    resolver = None
+                    if event['node']['actor'] is not None:
+                        resolver = event['node']['actor']['login']
+                    return closed_date, resolver
+
+            timeline_page_info = timeline['pageInfo']
+            before_event = timeline_page_info['startCursor']
+            if not timeline_page_info['hasPreviousPage']:
+                return None, None
+
+            try:
+                timeline = []
+
+                variables = {"owner": owner, "name": name, "afterIssue": previous_issues_cursor,
+                             "beforeEvent": before_event}
+                r = requests.post(self.api_url, headers=self.headers,
+                                  json={'query': query, 'variables': variables})
+                result_json = r.json()
+
+                timeline = result_json['data']['repository']['issues']['edges'][0]['node']['timeline']
+
+
+
+            except:
+                print('Error in getting graphql')
+                pass
+
+    def __parse_raw_issues(self, issue_list, owner, name):
         parsed_issues = []
+        previous_issue_cursor = None
 
         for issue in issue_list:
-            try:
-                reporter = None
 
-                opened_date = datetime.datetime.strptime(issue['node']['createdAt'], '%Y-%m-%dT%H:%M:%SZ')
-                closed_date = None
-                resolution_seconds = None  # Duration between opening and closing
-                if issue['node']['author'] is not None:
-                    reporter = issue['node']['author']['login']  # login /username of the user who reports the issue
+            previous_issue_cursor = issue['cursor']
+            reporter = None
 
-                issue_timeline = issue['node']['timeline']['edges']
-                resolver = None  # login /username of the user who resolves the issue
-                for event in issue_timeline:
-                    if '__typename' not in event['node']:
-                        break
-                    event_type = event['node']['__typename']
-                    if event_type == "ClosedEvent":
-                        closed_date = datetime.datetime.strptime(event['node']['createdAt'], '%Y-%m-%dT%H:%M:%SZ')
-                        if event['node']['actor'] is not None:
-                            resolver = event['node']['actor']['login']
-                        break
+            state = issue['node']['state']
 
-                if closed_date is not None:
-                    resolution_seconds = (closed_date - opened_date).seconds
+            opened_date = datetime.datetime.strptime(issue['node']['createdAt'], '%Y-%m-%dT%H:%M:%SZ')
+            resolution_seconds = None  # Duration between opening and closing
+            if issue['node']['author'] is not None:
+                reporter = issue['node']['author']['login']  # login /username of the user who reports the issue
 
-                parsed_issues.append({
-                    'opened_date': opened_date,
-                    'closed_date': closed_date,
-                    'resolution_duration': resolution_seconds,
-                    'reporter': reporter,
-                    'resolver': resolver
-                })
-            except:
-                print('Error in parsing issues')
-                pass
+            issue_timeline = issue['node']['timeline']
+            closed_date = None
+            resolver = None
+            if state == "CLOSED":
+                closed_date, resolver = self.__get_closed_date_of_issue(owner, name, previous_issue_cursor,
+                                                                        issue_timeline)
+
+            if closed_date is not None:
+                resolution_seconds = (closed_date - opened_date).seconds
+
+            parsed_issues.append({
+                'opened_date': opened_date,
+                'closed_date': closed_date,
+                'resolution_duration': resolution_seconds,
+                'reporter': reporter,
+                'resolver': resolver
+            })
 
         return parsed_issues
 
