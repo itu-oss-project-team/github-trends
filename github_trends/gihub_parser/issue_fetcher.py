@@ -9,10 +9,9 @@ from github_trends.services.database_service import DatabaseService
 
 
 class IssueFetcher:
-    def __init__(self, context):
+    def __init__(self):
         self.db_service = DatabaseService()
         self.last_commit_cursor = None
-        self.context = context
         self.api_url = "https://api.github.com/graphql"
         token = secret_config["github-api"]["tokens"][0]
         self.headers = {'Authorization': 'token ' + token}

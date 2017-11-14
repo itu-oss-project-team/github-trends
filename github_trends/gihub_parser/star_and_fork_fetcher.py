@@ -7,9 +7,8 @@ from github_trends.services.database_service import DatabaseService
 
 
 class StarAndForkFetcher:
-    def __init__(self, context):
+    def __init__(self):
         self.db_service = DatabaseService()
-        self.context = context
         self.last_commit_cursor = None
         self.api_url = "https://api.github.com/graphql"
         token = secret_config["github-api"]["tokens"][0]
