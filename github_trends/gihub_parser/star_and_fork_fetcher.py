@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import requests
 import collections
 
@@ -117,7 +117,7 @@ class StarAndForkFetcher:
 
         for edge in star_list:
             try:
-                date = datetime.datetime.strptime(edge["starredAt"], "%Y-%m-%dT%H:%M:%SZ").date()
+                date = datetime.strptime(edge["starredAt"], "%Y-%m-%dT%H:%M:%SZ").date()
 
                 if date not in date_stars_dict:
                     date_stars_dict[date] = 1
@@ -133,7 +133,7 @@ class StarAndForkFetcher:
 
         for edge in fork_list:
             try:
-                date = datetime.datetime.strptime(edge["node"]["createdAt"], "%Y-%m-%dT%H:%M:%SZ").date()
+                date = datetime.strptime(edge["node"]["createdAt"], "%Y-%m-%dT%H:%M:%SZ").date()
 
                 if date not in date_fork_dict:
                     date_fork_dict[date] = 1
@@ -145,27 +145,35 @@ class StarAndForkFetcher:
         return date_fork_dict
 
     def fetch_and_save_stars_of_repo(self, owner, name):
-        print("[" + str(datetime.datetime.now()) + "]: Calculating daily stars of repo " +
+        print("[" + str(datetime.now()) + "]: Calculating daily stars of repo " +
               owner + '/' + name + " started.")
 
         star_list, last_cursor = self.__fetch_stars_of_repo(owner, name)
-        self.context.AddStarList(owner + "/" + name, star_list)
         date_stars_dict = self.__calculate_daily_stars(star_list)
 
+        star_list = list(filter(lambda x: x is not None))
+        star_list = list(filter(lambda x: x["node"] is not None and x["starredAt"] is not None, star_list))
+        star_list = list(map(lambda x: {"login": x["node"]["login"],
+                             "date": datetime.strptime(x["starredAt"], "%Y-%m-%dT%H:%M:%SZ").date()}, star_list))
+
+        self.db_service.save_stars(owner, name, star_list)
         self.db_service.save_daily_stars_of_repo(owner, name, date_stars_dict)
 
-        print("[" + str(datetime.datetime.now()) + "]: Calculating daily stars of repo " +
+        print("[" + str(datetime.now()) + "]: Calculating daily stars of repo " +
               owner + "/" + name + " ended.")
 
     def fetch_and_save_forks_of_repo(self, owner, name):
-        print("[" + str(datetime.datetime.now()) + "]: Calculating daily forks of repo " +
+        print("[" + str(datetime.now()) + "]: Calculating daily forks of repo " +
               owner + '/' + name + " started.")
 
         fork_list, last_cursor = self.__fetch_forks_of_repo(owner, name)
-        self.context.AddForkList(owner + "/" + name, fork_list)
         date_fork_dict = self.__calculate_daily_forks(fork_list)
 
+        fork_list = list(map(lambda x: {"login": x["node"]["owner"]["login"],
+                             "date": datetime.strptime(x["node"]["createdAt"], "%Y-%m-%dT%H:%M:%SZ").date()}, fork_list))
+
+        self.db_service.save_forks(owner, name, fork_list)
         self.db_service.save_daily_forks_of_repo(owner, name, date_fork_dict)
 
-        print("[" + str(datetime.datetime.now()) + "]: Calculating daily forks of repo " +
+        print("[" + str(datetime.now()) + "]: Calculating daily forks of repo " +
               owner + "/" + name + " ended.")

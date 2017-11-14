@@ -23,9 +23,9 @@ class IssueFetcher:
 
         commit_list, last_cursor = self.__fetch_issues_of_repo(owner, name)
         parsed_issues = self.__parse_raw_issues(commit_list)
-        self.context.AddIssueList(owner + "/" + name, parsed_issues)
         date_issue_dict, daily_user_counts = self.__calculate_daily_stats(parsed_issues)
 
+        self.db_service.save_issues(owner, name, parsed_issues)
         self.db_service.save_daily_issues_of_repo(owner, name, date_issue_dict, daily_user_counts)
 
         print("[" + str(datetime.datetime.now()) + "]: Calculating daily issues of repo " +
