@@ -132,15 +132,6 @@ class DatabaseService:
 
             self.__executemany_insert_query(query, filtered_repos)
 
-    def save_developer_stats(self, user_stats_dict):
-        query = ''' INSERT IGNORE daily_developer_stats(login, date, starred_repo_count, forked_repo_count,
-                    contributed_repo_count, commit_count, opened_issue_count, resolved_issue_count)
-                    VALUES( %s, %s, %s, %s, %s, %s, %s, %s)'''
-
-        user_stats = tuple(user_stats_dict.values())
-
-        self.__insert_query(query, user_stats)
-
     def get_developers(self):
         query = ''' SELECT DISTINCT login FROM daily_repo_contributions '''
 
@@ -191,7 +182,7 @@ class DatabaseService:
     def save_releases(self, owner, name, release_list):
         repo_id = self.get_repo_id_by_name_and_owner(owner, name)
 
-        release_tuple_list = list(map(lambda x: (x["date"], x["login"], repo_id)), release_list)
+        release_tuple_list = list(map(lambda x: (x["date"], x["login"], repo_id),release_list))
         query = ''' INSERT INTO releases(date, login, repo_id)
                     VALUES (%s, %s, %s) '''
 
@@ -244,7 +235,7 @@ class DatabaseService:
         query = '''
                 SELECT
                     date, 
-                    count(*) as StarCount
+                    (select count(*) from stars where date <= S.date and login = S.login) as StarCount
                 FROM `stars` S
                 WHERE login = %s and date <= %s
                 group by date, login
@@ -259,7 +250,7 @@ class DatabaseService:
         query = '''
                 SELECT 
                     date, 
-                    count(*) as ForkCount
+                    (select count(*) from forks where date <= F.date and login = F.login) as ForkCount
                 FROM `forks` F
                 WHERE login = %s and date <= %s
                 group by date, login  
@@ -267,18 +258,22 @@ class DatabaseService:
                 '''
 
         fork_list = self.__execute_select_query(query, (login, date))
-        fork_dict = OrderedDict(map(lambda x: (x["date"], x["StarCount"]), fork_list))
+        fork_dict = OrderedDict(map(lambda x: (x["date"], x["ForkCount"]), fork_list))
         return fork_dict
 
     def get_number_of_contributed_repos_of_a_user(self, login, date):
         query = '''
-                SET @rank=(SELECT Count(*) from 
-                    (SELECT min(date), repo_id FROM commits WHERE login = %s and date <= %s
-                     GROUP BY repo_id) S)+1;
-                
-                SELECT min(date) as date, @rank:=@rank-1 AS NumberOfContributedRepos FROM commits 
-                WHERE login = %s and date <= %s
-                GROUP BY repo_id
+                SELECT S.date, 
+                @rank:=@rank-1 AS NumberOfContributedRepos 
+                FROM (SELECT 
+                min(date) as date
+                FROM commits
+                WHERE commits.login = %s and date <= %s
+                GROUP BY repo_id) S,
+                (Select @rank:= (SELECT Count(*) from 
+                (SELECT min(date), repo_id FROM commits WHERE login = %s and date <= %s
+                 GROUP BY repo_id) S)+1) RN
+                order by S.date desc
                 '''
 
         contribution_list = self.__execute_select_query(query, (login, date, login, date))
@@ -289,7 +284,7 @@ class DatabaseService:
         query = '''
                 SELECT
                     date, 
-                    count(*) as ReleaseCount
+                    (select count(*) from releases where date <= R.date and login = R.login) as ReleaseCount
                 FROM `releases` R
                 WHERE login = %s and date <= %s
                 group by date, login
@@ -300,7 +295,17 @@ class DatabaseService:
         release_dict = OrderedDict(map(lambda x: (x["date"], x["ReleaseCount"]), release_list))
         return release_dict
 
+    def save_daily_developer_stats(self, login, developer_dict):
+        query = '''
+                INSERT IGNORE daily_developer_stats (login, date, starred_repo_count, forked_repo_column, 
+                contributed_repo_count, commit_count, opened_issue_count, resolved_issue_count, release_count)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                '''
+        developer_stats = [(login, date, stats_dict['star'], stats_dict['fork'], stats_dict['contributed_repo'],
+                            stats_dict['commit'], stats_dict['opened_issue'], stats_dict['closed_issue'],
+                            stats_dict['release']) for (date, stats_dict) in developer_dict.items()]
 
+        self.__executemany_insert_query(query, developer_stats)
     
 
 

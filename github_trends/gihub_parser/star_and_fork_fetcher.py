@@ -150,7 +150,7 @@ class StarAndForkFetcher:
         star_list, last_cursor = self.__fetch_stars_of_repo(owner, name)
         date_stars_dict = self.__calculate_daily_stars(star_list)
 
-        star_list = list(filter(lambda x: x is not None))
+        star_list = list(filter(lambda x: x is not None, star_list))
         star_list = list(filter(lambda x: x["node"] is not None and x["starredAt"] is not None, star_list))
         star_list = list(map(lambda x: {"login": x["node"]["login"],
                              "date": datetime.strptime(x["starredAt"], "%Y-%m-%dT%H:%M:%SZ").date()}, star_list))

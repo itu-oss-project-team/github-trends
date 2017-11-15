@@ -1,12 +1,59 @@
 from datetime import datetime
+from collections import OrderedDict, defaultdict
+from pprint import pprint
+
 from github_trends.services.database_service import DatabaseService
 
-class UserFetcher:
-    def __init__(self, context):
-        self.context = context
-        self.__db_service = DatabaseService()
+db_service = DatabaseService()
 
-    def AnalyzeUser(self, user_login, date, category):
+class UserFetcher:
+    def __init__(self):
+        self.db_service = db_service
+
+    def AnalyzeUser(self, user_login, date, category=None):
+
+        commit_counts = self.db_service.get_cumulative_commits_of_a_user(user_login, date)
+        opened_issue_counts = self.db_service.get_cumulative_opened_issues_of_a_user(user_login, date)
+        closed_issue_counts = self.db_service.get_cumulative_closed_issues_of_a_user(user_login, date)
+        star_counts = self.db_service.get_number_of_starred_repos_of_a_user(user_login, date)
+        fork_counts = self.db_service.get_number_of_forked_repos_of_a_user(user_login, date)
+        contributed_repo_counts = self.db_service.get_number_of_contributed_repos_of_a_user(user_login, date)
+        release_counts = self.db_service.get_number_of_releases_of_a_user(user_login, date)
+
+        counts_dicts = {
+            'commit': commit_counts,
+            'opened_issue': opened_issue_counts,
+            'closed_issue': closed_issue_counts,
+            'star': star_counts,
+            'fork': fork_counts,
+            'contributed_repo': contributed_repo_counts,
+            'release': release_counts
+        }
+
+        ##########
+
+        dates_set = sorted(set().union([date_key for counts in counts_dicts.values() for date_key in counts]))
+        total_dict = defaultdict(lambda: defaultdict(int))
+
+        for data_key, counts_dict in counts_dicts.items():
+            if counts_dict:
+                last_date, current_count = counts_dict.popitem(last=True)
+            else:
+                last_date = datetime(1900, 1, 1).date()
+                current_count = 0
+
+            last_count = 0
+
+            for date in dates_set:
+                if date >= last_date:
+                    last_count = current_count
+                    if counts_dict:
+                        last_date, current_count = counts_dict.popitem()
+                total_dict[date][data_key] += last_count
+
+        self.db_service.save_daily_developer_stats(user_login, total_dict)
+
+    def AnalyzeUserOld(self, user_login, date, category):
         print('User ', user_login, ' Date: ', str(date))
 
         numberOfReposStarred = 0
@@ -73,5 +120,10 @@ class UserFetcher:
             pass
 
 
-
+if __name__ == "__main__":
+    uf = UserFetcher()
+    developers = db_service.get_developers()
+    for developer in developers:
+        print("[" + str(datetime.now()) + "]: " + developer["login"])
+        uf.AnalyzeUser(developer["login"], datetime(2016, 12, 31).date())
 
