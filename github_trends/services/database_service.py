@@ -1,5 +1,8 @@
-import pymysql
+import time
 from collections import OrderedDict
+
+import pymysql
+from bigquery import get_client
 
 from github_trends import category_repos
 from github_trends import secret_config
@@ -8,12 +11,14 @@ from github_trends import secret_config
 class DatabaseService:
     def __init__(self):
         self.__mysql_config = secret_config['mysql']
+        self.__bigquery_config = secret_config['bigquery-api']
+        self.__bigquery_client = None
 
     def __get_connection(self):
         mysql_config = self.__mysql_config
         conn = pymysql.connect(host=mysql_config['host'], port=mysql_config['port'], db=mysql_config['db'],
-                                    user=mysql_config['user'], passwd=mysql_config['passwd'], charset='utf8mb4',
-                                    use_unicode=True)
+                               user=mysql_config['user'], passwd=mysql_config['passwd'], charset='utf8mb4',
+                               use_unicode=True)
         return conn
 
     def __executemany_insert_query(self, query, data):
@@ -41,9 +46,17 @@ class DatabaseService:
         dict_cursor.close()
         return values
 
-    def get_repo_id_by_name_and_owner(self, owner,name):
-        query = '''Select id from repos
-                   WHERE owner = %s and name = %s
+    def get_repo_id_by_full_name(self, full_name):
+        query = '''SELECT id FROM repos
+                   WHERE full_name = %s
+                '''
+
+        repo_id_list = self.__execute_select_query(query, full_name)
+        return repo_id_list[0]["id"]
+
+    def get_repo_id_by_name_and_owner(self, owner, name):
+        query = '''SELECT id FROM repos
+                   WHERE owner = %s AND name = %s
                 '''
 
         repo_id_list = self.__execute_select_query(query, (owner, name))
@@ -107,13 +120,37 @@ class DatabaseService:
 
     def save_daily_releases_of_repo(self, owner, name, date_release_dict):
         repo_id = self.get_repo_id_by_name_and_owner(owner, name)
-        release_data = [(repo_id, k, v) for (k,v) in date_release_dict.items()]
+        release_data = [(repo_id, k, v) for (k, v) in date_release_dict.items()]
 
         query = ''' INSERT IGNORE daily_repo_releases (repo_id, date, release_count)
                     VALUES (%s, %s, %s) '''
 
         try:
             self.__executemany_insert_query(query, release_data)
+        except:
+            pass
+
+    def save_daily_so_stats_of_repo(self, full_name, stats):
+        repo_id = self.get_repo_id_by_full_name(full_name)
+        data = [(repo_id, stat['date'], stat['question_count'], stat['view_sum'], stat['score_sum'], stat['answer_sum'])
+                for stat in stats]
+
+        query = ''' 
+            INSERT INTO daily_stackoverflow_questions (repo_id, date, question_count, view_sum, score_sum, answer_sum)
+                    VALUES ( %s, %s, %s, %s, %s, %s )
+        '''
+        try:
+            self.__executemany_insert_query(query, data)
+        except:
+            pass
+
+    def save_daily_so_stats_of_repo2(self, full_name, stats):
+        query = ''' 
+            INSERT INTO daily_stackoverflow_questions (repo_id, date, question_count, view_sum, score_sum, answer_sum)
+                    VALUES ({}, %s, %s, %s, %s, %s ) 
+        '''.format(self.get_repo_id_by_full_name(full_name))
+        try:
+            self.__executemany_insert_query(query, stats)
         except:
             pass
 
@@ -172,7 +209,7 @@ class DatabaseService:
         issue_tuple_list = list(map(lambda x: (
             x["opened_date"].date() if x["opened_date"] is not None else None,
             x["closed_date"].date() if x["closed_date"] is not None else None,
-            x["reporter"],  x["resolver"], repo_id, x["resolution_duration"]), issue_list))
+            x["reporter"], x["resolver"], repo_id, x["resolution_duration"]), issue_list))
 
         query = ''' INSERT INTO issues(opened_date, resolved_date, reporter, resolver, repo_id, resolution_duration_sec)
                     VALUES (%s, %s, %s, %s, %s, %s) '''
@@ -182,21 +219,20 @@ class DatabaseService:
     def save_releases(self, owner, name, release_list):
         repo_id = self.get_repo_id_by_name_and_owner(owner, name)
 
-        release_tuple_list = list(map(lambda x: (x["date"], x["login"], repo_id),release_list))
+        release_tuple_list = list(map(lambda x: (x["date"], x["login"], repo_id), release_list))
         query = ''' INSERT INTO releases(date, login, repo_id)
                     VALUES (%s, %s, %s) '''
 
         self.__executemany_insert_query(query, release_tuple_list)
 
-
     def get_cumulative_commits_of_a_user(self, login, date):
         query = '''
             SELECT DISTINCT 
             C.date, 
-            (select count(*) from commits innerC where innerC.date <= C.date and innerC.login = C.login) as NumberOfCommits
+            (SELECT count(*) FROM commits innerC WHERE innerC.date <= C.date AND innerC.login = C.login) AS NumberOfCommits
             FROM `commits` C
-            where login = %s and C.date <= %s
-            order by C.date desc
+            WHERE login = %s AND C.date <= %s
+            ORDER BY C.date DESC
                 '''
 
         commit_list = self.__execute_select_query(query, (login, date))
@@ -207,10 +243,10 @@ class DatabaseService:
         query = '''
             SELECT DISTINCT 
             I.opened_date,
-            (select count(*) from issues innerI where innerI.opened_date <= I.opened_date and innerI.reporter = I.reporter) as NumberOfIssuesOpened                
+            (SELECT count(*) FROM issues innerI WHERE innerI.opened_date <= I.opened_date AND innerI.reporter = I.reporter) AS NumberOfIssuesOpened                
             FROM issues I
-            where I.reporter = %s and I.opened_date <= %s
-            order by I.opened_date desc
+            WHERE I.reporter = %s AND I.opened_date <= %s
+            ORDER BY I.opened_date DESC
                 '''
 
         opened_issue_list = self.__execute_select_query(query, (login, date))
@@ -221,25 +257,26 @@ class DatabaseService:
         query = '''
             SELECT DISTINCT 
             I.resolved_date,
-            (select count(*) from issues innerI where innerI.resolved_date <= I.resolved_date and innerI.resolver = I.resolver) as NumberOfIssuesClosed
+            (SELECT count(*) FROM issues innerI WHERE innerI.resolved_date <= I.resolved_date AND innerI.resolver = I.resolver) AS NumberOfIssuesClosed
             FROM issues I
-            where I.resolver = %s and I.resolved_date <= %s
-            order by I.resolved_date desc                        
+            WHERE I.resolver = %s AND I.resolved_date <= %s
+            ORDER BY I.resolved_date DESC                        
               '''
 
         opened_issue_list = self.__execute_select_query(query, (login, date))
-        opened_issue_dict = OrderedDict(map(lambda x: (x["resolved_date"], x["NumberOfIssuesClosed"]), opened_issue_list))
+        opened_issue_dict = OrderedDict(
+            map(lambda x: (x["resolved_date"], x["NumberOfIssuesClosed"]), opened_issue_list))
         return opened_issue_dict
 
     def get_number_of_starred_repos_of_a_user(self, login, date):
         query = '''
                 SELECT
                     date, 
-                    (select count(*) from stars where date <= S.date and login = S.login) as StarCount
+                    (SELECT count(*) FROM stars WHERE date <= S.date AND login = S.login) AS StarCount
                 FROM `stars` S
-                WHERE login = %s and date <= %s
-                group by date, login
-                order by date desc
+                WHERE login = %s AND date <= %s
+                GROUP BY date, login
+                ORDER BY date DESC
                 '''
 
         star_list = self.__execute_select_query(query, (login, date))
@@ -250,10 +287,10 @@ class DatabaseService:
         query = '''
                 SELECT 
                     date, 
-                    (select count(*) from forks where date <= F.date and login = F.login) as ForkCount
+                    (SELECT count(*) FROM forks WHERE date <= F.date AND login = F.login) AS ForkCount
                 FROM `forks` F
-                WHERE login = %s and date <= %s
-                group by date, login  
+                WHERE login = %s AND date <= %s
+                GROUP BY date, login  
                 ORDER BY date DESC
                 '''
 
@@ -266,14 +303,14 @@ class DatabaseService:
                 SELECT S.date, 
                 @rank:=@rank-1 AS NumberOfContributedRepos 
                 FROM (SELECT 
-                min(date) as date
+                min(date) AS date
                 FROM commits
-                WHERE commits.login = %s and date <= %s
+                WHERE commits.login = %s AND date <= %s
                 GROUP BY repo_id) S,
-                (Select @rank:= (SELECT Count(*) from 
-                (SELECT min(date), repo_id FROM commits WHERE login = %s and date <= %s
+                (SELECT @rank:= (SELECT Count(*) FROM 
+                (SELECT min(date), repo_id FROM commits WHERE login = %s AND date <= %s
                  GROUP BY repo_id) S)+1) RN
-                order by S.date desc
+                ORDER BY S.date DESC
                 '''
 
         contribution_list = self.__execute_select_query(query, (login, date, login, date))
@@ -284,11 +321,11 @@ class DatabaseService:
         query = '''
                 SELECT
                     date, 
-                    (select count(*) from releases where date <= R.date and login = R.login) as ReleaseCount
+                    (SELECT count(*) FROM releases WHERE date <= R.date AND login = R.login) AS ReleaseCount
                 FROM `releases` R
-                WHERE login = %s and date <= %s
-                group by date, login
-                order by date desc
+                WHERE login = %s AND date <= %s
+                GROUP BY date, login
+                ORDER BY date DESC
                 '''
 
         release_list = self.__execute_select_query(query, (login, date))
@@ -306,6 +343,27 @@ class DatabaseService:
                             stats_dict['release']) for (date, stats_dict) in developer_dict.items()]
 
         self.__executemany_insert_query(query, developer_stats)
-    
 
+    # GHTorrent Services #
 
+    def get_bigquery_client(self, use_legacy_sql=False):
+        if self.__bigquery_client is None:
+            json_key = self.__bigquery_config['json_key']
+            self.__bigquery_client = get_client(json_key=json_key, readonly=True)
+        return self.__bigquery_client
+
+    def execute_bigquery_select(self, query):
+        client = self.get_bigquery_client()
+
+        # Submit an async query.
+        job_id, _results = client.query(query, use_legacy_sql=False)
+
+        retry_count = 100
+        complete = False
+        while retry_count > 0 and not complete:
+            complete, _ = client.check_job(job_id)
+            retry_count -= 1
+            time.sleep(10)
+
+        # Retrieve the results.
+        return client.get_query_rows(job_id)
