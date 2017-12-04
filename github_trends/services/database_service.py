@@ -297,7 +297,7 @@ class DatabaseService:
 
     def save_daily_developer_stats(self, login, developer_dict):
         query = '''
-                INSERT IGNORE daily_developer_stats (login, date, starred_repo_count, forked_repo_column, 
+                INSERT IGNORE daily_developer_stats (login, date, starred_repo_count, forked_repo_count, 
                 contributed_repo_count, commit_count, opened_issue_count, resolved_issue_count, release_count)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 '''
@@ -306,6 +306,25 @@ class DatabaseService:
                             stats_dict['release']) for (date, stats_dict) in developer_dict.items()]
 
         self.__executemany_insert_query(query, developer_stats)
+
+    def get_daily_developer_stats(self, category=None):
+        query = '''
+                SELECT *
+                FROM daily_developer_stats
+                '''
+
+        developer_stats = self.__execute_select_query(query, data=None)
+        return developer_stats
+
+    def update_daily_developer_stats(self, developer_stats):
+        query = '''
+                UPDATE daily_developer_stats
+                SET score = %s
+                WHERE id = %s
+                '''
+
+        data = list(map(lambda x: (x["score"], x["id"]), developer_stats))
+        self.__executemany_insert_query(query, data)
     
 
 

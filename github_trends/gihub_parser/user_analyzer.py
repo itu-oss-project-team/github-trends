@@ -1,6 +1,8 @@
 from datetime import datetime
 from collections import OrderedDict, defaultdict
-from pprint import pprint
+from sklearn import preprocessing
+import numpy as np
+import pandas as pd
 
 from github_trends.services.database_service import DatabaseService
 
@@ -52,6 +54,47 @@ class UserFetcher:
                 total_dict[date][data_key] += last_count
 
         self.db_service.save_daily_developer_stats(user_login, total_dict)
+
+    def __calculate_score(self, developer_stat: dict):
+        normalizer = sum(range(1,8))
+        score = 0
+        attribute_weight_dict = {
+            "commit_count": 7/normalizer,
+            "resolved_issue_count": 6/normalizer,
+            "release_count": 5/normalizer,
+            "contributed_repo_count": 4/normalizer,
+            "opened_issue_count": 3/normalizer,
+            "forked_repo_count": 2/normalizer,
+            "starred_repo_count": 1/normalizer
+        }
+        for key, value in developer_stat.items():
+            if key in attribute_weight_dict:
+                score += value * attribute_weight_dict[key]
+
+        return score
+
+    def __scale_data(self, data):
+        key_list = ["commit_count", "resolved_issue_count", "release_count", "contributed_repo_count",
+                    "opened_issue_count", "forked_repo_count", "starred_repo_count"]
+
+        data_df = pd.DataFrame(data)
+        for key in key_list:
+            max = data_df[key].max()
+            min = data_df[key].min()
+            data_df[key] = (data_df[key] - min) / (max - min)
+
+        scaled_data = data_df.to_dict('records') # records is keyword stated in documentation.
+        return scaled_data
+
+    def CalculateScoreForAllUsers(self, category=None):
+        developer_stats = self.db_service.get_daily_developer_stats()
+        developer_stats_scaled = self.__scale_data(developer_stats)
+
+        developer_scores = sorted(list(map(
+            lambda x: {"id": x["id"], "date": x["date"], "login": x["login"], "score": self.__calculate_score(x)}, developer_stats_scaled
+        )), key=lambda x: x["score"], reverse=True)
+
+        self.db_service.update_daily_developer_stats(developer_scores)
 
     def AnalyzeUserOld(self, user_login, date, category):
         print('User ', user_login, ' Date: ', str(date))
@@ -123,7 +166,11 @@ class UserFetcher:
 if __name__ == "__main__":
     uf = UserFetcher()
     developers = db_service.get_developers()
+    '''
     for developer in developers:
         print("[" + str(datetime.now()) + "]: " + developer["login"])
         uf.AnalyzeUser(developer["login"], datetime(2016, 12, 31).date())
+    '''
+
+    uf.CalculateScoreForAllUsers()
 
