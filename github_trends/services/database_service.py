@@ -37,7 +37,7 @@ class DatabaseService:
         conn.commit()
         dict_cursor.close()
 
-    def __execute_select_query(self, query, data):
+    def execute_select_query(self, query, data):
         conn = self.__get_connection()
         dict_cursor = conn.cursor(pymysql.cursors.DictCursor)
 
@@ -51,7 +51,7 @@ class DatabaseService:
                    WHERE full_name = %s
                 '''
 
-        repo_id_list = self.__execute_select_query(query, full_name)
+        repo_id_list = self.execute_select_query(query, full_name)
         return repo_id_list[0]["id"]
 
     def get_repo_id_by_name_and_owner(self, owner, name):
@@ -59,7 +59,7 @@ class DatabaseService:
                    WHERE owner = %s AND name = %s
                 '''
 
-        repo_id_list = self.__execute_select_query(query, (owner, name))
+        repo_id_list = self.execute_select_query(query, (owner, name))
         return repo_id_list[0]["id"]
 
     def save_daily_commits_of_repo(self, owner, name, date_commit_dict):
@@ -172,7 +172,7 @@ class DatabaseService:
     def get_developers(self):
         query = ''' SELECT DISTINCT login FROM daily_repo_contributions '''
 
-        developers = self.__execute_select_query(query, None)
+        developers = self.execute_select_query(query, None)
 
         return developers
 
@@ -235,7 +235,7 @@ class DatabaseService:
             ORDER BY C.date DESC
                 '''
 
-        commit_list = self.__execute_select_query(query, (login, date))
+        commit_list = self.execute_select_query(query, (login, date))
         commit_dict = OrderedDict(map(lambda x: (x["date"], x["NumberOfCommits"]), commit_list))
         return commit_dict
 
@@ -249,7 +249,7 @@ class DatabaseService:
             ORDER BY I.opened_date DESC
                 '''
 
-        opened_issue_list = self.__execute_select_query(query, (login, date))
+        opened_issue_list = self.execute_select_query(query, (login, date))
         opened_issue_dict = OrderedDict(map(lambda x: (x["opened_date"], x["NumberOfIssuesOpened"]), opened_issue_list))
         return opened_issue_dict
 
@@ -263,7 +263,7 @@ class DatabaseService:
             ORDER BY I.resolved_date DESC                        
               '''
 
-        opened_issue_list = self.__execute_select_query(query, (login, date))
+        opened_issue_list = self.execute_select_query(query, (login, date))
         opened_issue_dict = OrderedDict(
             map(lambda x: (x["resolved_date"], x["NumberOfIssuesClosed"]), opened_issue_list))
         return opened_issue_dict
@@ -279,7 +279,7 @@ class DatabaseService:
                 ORDER BY date DESC
                 '''
 
-        star_list = self.__execute_select_query(query, (login, date))
+        star_list = self.execute_select_query(query, (login, date))
         star_dict = OrderedDict(map(lambda x: (x["date"], x["StarCount"]), star_list))
         return star_dict
 
@@ -294,7 +294,7 @@ class DatabaseService:
                 ORDER BY date DESC
                 '''
 
-        fork_list = self.__execute_select_query(query, (login, date))
+        fork_list = self.execute_select_query(query, (login, date))
         fork_dict = OrderedDict(map(lambda x: (x["date"], x["ForkCount"]), fork_list))
         return fork_dict
 
@@ -313,7 +313,7 @@ class DatabaseService:
                 ORDER BY S.date DESC
                 '''
 
-        contribution_list = self.__execute_select_query(query, (login, date, login, date))
+        contribution_list = self.execute_select_query(query, (login, date, login, date))
         contribution_dict = OrderedDict(map(lambda x: (x["date"], x["NumberOfContributedRepos"]), contribution_list))
         return contribution_dict
 
@@ -328,7 +328,7 @@ class DatabaseService:
                 ORDER BY date DESC
                 '''
 
-        release_list = self.__execute_select_query(query, (login, date))
+        release_list = self.execute_select_query(query, (login, date))
         release_dict = OrderedDict(map(lambda x: (x["date"], x["ReleaseCount"]), release_list))
         return release_dict
 
