@@ -1,8 +1,6 @@
-import time
 from collections import OrderedDict
 
 import pymysql
-from bigquery import get_client
 
 from github_trends import category_repos
 from github_trends import secret_config
@@ -11,8 +9,6 @@ from github_trends import secret_config
 class DatabaseService:
     def __init__(self):
         self.__mysql_config = secret_config['mysql']
-        #self.__bigquery_config = secret_config['bigquery-api']
-        self.__bigquery_client = None
 
     def __get_connection(self):
         mysql_config = self.__mysql_config
@@ -53,6 +49,14 @@ class DatabaseService:
 
         repo_id_list = self.execute_select_query(query, full_name)
         return repo_id_list[0]["id"]
+
+    def get_repo_full_name_by_id(self, id):
+        query = '''SELECT full_name FROM repos
+                   WHERE id = %s
+                '''
+
+        repo_id_list = self.execute_select_query(query, id)
+        return repo_id_list[0]["full_name"]
 
     def get_repo_id_by_name_and_owner(self, owner, name):
         query = '''SELECT id FROM repos
@@ -263,7 +267,7 @@ class DatabaseService:
             ORDER BY I.resolved_date DESC                        
               '''
 
-        opened_issue_list = self.__execute_select_query(query, (login, date))
+        opened_issue_list = self.execute_select_query(query, (login, date))
         opened_issue_dict = OrderedDict(map(lambda x: (x["resolved_date"], x["NumberOfIssuesClosed"]), opened_issue_list))
         opened_issue_list = self.execute_select_query(query, (login, date))
         opened_issue_dict = OrderedDict(
@@ -403,26 +407,3 @@ class DatabaseService:
         weekly_repo_stats = self.execute_select_query(query, repo_id)
         return weekly_repo_stats
 
-    # GHTorrent Services #
-
-    def get_bigquery_client(self, use_legacy_sql=False):
-        if self.__bigquery_client is None:
-            json_key = self.__bigquery_config['json_key']
-            self.__bigquery_client = get_client(json_key=json_key, readonly=True)
-        return self.__bigquery_client
-
-    def execute_bigquery_select(self, query):
-        client = self.get_bigquery_client()
-
-        # Submit an async query.
-        job_id, _results = client.query(query, use_legacy_sql=False)
-
-        retry_count = 100
-        complete = False
-        while retry_count > 0 and not complete:
-            complete, _ = client.check_job(job_id)
-            retry_count -= 1
-            time.sleep(10)
-
-        # Retrieve the results.
-        return client.get_query_rows(job_id)
