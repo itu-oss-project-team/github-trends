@@ -11,7 +11,7 @@ from github_trends import secret_config
 class DatabaseService:
     def __init__(self):
         self.__mysql_config = secret_config['mysql']
-        self.__bigquery_config = secret_config['bigquery-api']
+        #self.__bigquery_config = secret_config['bigquery-api']
         self.__bigquery_client = None
 
     def __get_connection(self):
@@ -361,6 +361,44 @@ class DatabaseService:
 
         data = list(map(lambda x: (x["score"], x["id"]), developer_stats))
         self.__executemany_insert_query(query, data)
+
+    def get_daily_repo_stats_by_day(self, repo_id):
+        query = '''
+                SELECT *
+                FROM daily_repo_stats
+                WHERE repo_id = %s AND year(date) >= 2013
+                ORDER BY date ASC
+                '''
+
+        daily_repo_stats = self.__execute_select_query(query, repo_id)
+        return daily_repo_stats
+
+    def get_daily_repo_stats_by_week(self, repo_id):
+        query = '''
+                SELECT week(date) as week,
+                       month(date) as month,
+                       year(date) as year,
+                       repo_id,
+                       SUM(commit_count) as CommitSum,
+                       SUM(weighted_commit_count) as WeightedCommitSum,
+                       SUM(opened_issue_count) as OpenedIssueSum,
+                       SUM(weighted_opened_count) as WeightedOpenedIssueSum,
+                       SUM(closed_issue_count) as ClosedIssueSum,
+                       SUM(weighted_closed_issue_count) as WeightedClosedIssueSum,
+                       SUM(release_count) as ReleaseSum,
+                       SUM(weighted_release_count) as WeightedReleaseSum,
+                       SUM(star_count) as StarSum,
+                       SUM(weighted_star_count) as WeightedStarSum,
+                       SUM(fork_count) as ForkSum,
+                       SUM(weighted_fork_count) as WeightedForkSum
+                FROM daily_repo_stats
+                WHERE repo_id = %s AND year(date) >= 2013
+                GROUP BY week, month, year, repo_id
+                ORDER BY year ASC, month ASC, week ASC
+                '''
+
+        weekly_repo_stats = self.__execute_select_query(query, repo_id)
+        return weekly_repo_stats
 
     # GHTorrent Services #
 

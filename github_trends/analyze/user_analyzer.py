@@ -91,8 +91,9 @@ class UserFetcher:
         developer_stats_scaled = self.__scale_data(developer_stats)
 
         developer_scores = sorted(list(map(
-            lambda x: {"id": x["id"], "date": x["date"], "login": x["login"], "score": self.__calculate_score(x)}, developer_stats_scaled
-        )), key=lambda x: x["score"], reverse=True)
+            lambda x: {"id": x["id"], "date": x["date"], "login": x["login"], "score": self.__calculate_score(x)},
+            developer_stats_scaled)),
+            key=lambda x: x["score"], reverse=True)
 
         self.db_service.update_daily_developer_stats(developer_scores)
 
@@ -166,11 +167,10 @@ class UserFetcher:
 if __name__ == "__main__":
     uf = UserFetcher()
     developers = db_service.get_developers()
-    '''
+
     for developer in developers:
         print("[" + str(datetime.now()) + "]: " + developer["login"])
-        uf.AnalyzeUser(developer["login"], datetime(2016, 12, 31).date())
-    '''
+        uf.AnalyzeUser(developer["login"], datetime.now().date())
 
     uf.CalculateScoreForAllUsers()
 
