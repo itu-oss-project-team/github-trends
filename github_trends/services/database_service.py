@@ -352,7 +352,7 @@ class DatabaseService:
                 FROM daily_developer_stats
                 '''
 
-        developer_stats = self.__execute_select_query(query, data=None)
+        developer_stats = self.execute_select_query(query, data=None)
         return developer_stats
 
     def update_daily_developer_stats(self, developer_stats):
@@ -373,7 +373,7 @@ class DatabaseService:
                 ORDER BY date ASC
                 '''
 
-        daily_repo_stats = self.__execute_select_query(query, repo_id)
+        daily_repo_stats = self.execute_select_query(query, repo_id)
         return daily_repo_stats
 
     def get_daily_repo_stats_by_week(self, repo_id):
@@ -400,7 +400,7 @@ class DatabaseService:
                 ORDER BY year ASC, month ASC, week ASC
                 '''
 
-        weekly_repo_stats = self.__execute_select_query(query, repo_id)
+        weekly_repo_stats = self.execute_select_query(query, repo_id)
         return weekly_repo_stats
 
     # GHTorrent Services #
