@@ -180,6 +180,13 @@ class DatabaseService:
 
         return developers
 
+    def get_repos(self):
+        query = ''' SELECT * FROM repos '''
+
+        repos = self.execute_select_query(query, None)
+
+        return repos
+
     def save_commits(self, owner, name, commit_list):
         repo_id = self.get_repo_id_by_name_and_owner(owner, name)
 
