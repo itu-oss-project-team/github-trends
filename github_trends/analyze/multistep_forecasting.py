@@ -120,7 +120,7 @@ class Forecasting:
                                               index=test_dates)
 
         aggregated_absolute_error = {"repo": repo_name}
-        for day in relative_errors_df:
+        for day in absolute_errors_df:
             aggregated_absolute_error["{} Mean".format(day)] = absolute_errors_df[day].mean()
             aggregated_absolute_error["{} Min".format(day)] = absolute_errors_df[day].min()
             aggregated_absolute_error["{} Max".format(day)] = absolute_errors_df[day].max()
@@ -130,7 +130,7 @@ class Forecasting:
         self.aggregated_absolute_errors.append(aggregated_absolute_error)
 
         absolute_errors_df.to_csv('output/Boxplots/absolute_error_' + str(repo_name) + '.csv')
-        self.__plot_boxplot_with_mean_labels(relative_errors_df, 'output/Boxplots/absolute_error_{}'.format(repo_name))
+        self.__plot_boxplot_with_mean_labels(absolute_errors_df, 'output/Boxplots/absolute_error_{}'.format(repo_name))
 
     def evaluate_first_day_results(self, first_day_rmse, pred, actual, test_dates, repo_name):
         inv_predfirst_low = np.array(list(map(lambda x: x - first_day_rmse, pred)))
