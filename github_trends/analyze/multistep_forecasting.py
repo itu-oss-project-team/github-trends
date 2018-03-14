@@ -162,6 +162,12 @@ class Forecasting:
         pyplot.fill_between(X_points, inv_predlast_low, inv_predlast_up, color='m', alpha=0.2)
         pyplot.savefig('output/Daily_Last_Day/mse_' + str(repo_name) + '.png')
 
+        last_days_cumulative_df = last_day_df.cumsum()
+        last_days_cumulative_df.to_csv('output/Last_Day_Cumulative/mse_' + str(repo_name) + '.csv')
+        last_days_cumulative_df.plot()
+        pyplot.savefig('output/Last_Day_Cumulative/mse_' + str(repo_name) + '.png')
+        pyplot.clf()
+
     def evaluate_projection_sum_results(self, proj_sum_rmse, pred, actual, test_dates, repo_name):
         proj_sum_pred_low = np.array(list(map(lambda x: x - proj_sum_rmse, pred)))
         proj_sum_pred_up = np.array(list(map(lambda x: x + proj_sum_rmse, pred)))
