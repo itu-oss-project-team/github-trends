@@ -36,9 +36,9 @@ def clear_db(conn):
     cursor.execute("""
             SET foreign_key_checks = 0;
             DROP TABLE IF EXISTS
-            `categories`, `category_repos`, `daily_repo_commits`, `daily_repo_contributions`, `daily_repo_forks`, 
-            `daily_repo_issue_activities`, `daily_repo_issues`,`daily_repo_releases`, `daily_repo_stars`, 
-            `daily_stackoverflow_questions`, `repos`;
+            `commits`, `categories`, `category_repos`, `daily_repo_commits`, `daily_repo_contributions`, `daily_repo_forks`, 
+            `daily_repo_issue_activities`, `daily_repo_issues`,`daily_repo_releases`, `daily_repo_stars`, `daily_developer_stats`,
+            `daily_stackoverflow_questions`, `repos`, `forks`, `issues`, `releases`, `stars`;
             SET foreign_key_checks = 1;
     """)
 
