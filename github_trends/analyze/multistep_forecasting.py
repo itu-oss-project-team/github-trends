@@ -1,13 +1,13 @@
-from keras.models import Sequential
-from keras.layers import *
-import pandas
-import numpy as np
-from matplotlib import pyplot
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error
 from math import sqrt
-from datetime import timedelta
+
+import numpy as np
 import os
+import pandas
+from keras.layers import *
+from keras.models import Sequential
+from matplotlib import pyplot
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
 
 from github_trends.services.database_service import DatabaseService
 
@@ -184,7 +184,8 @@ class Forecasting:
 
         pyplot.clf()
 
-    def forecast_stars_of_repo(self, repo_name, data_df, input_features, output_features, input_days=60, output_days=7, **kwargs):
+    def forecast_stars_of_repo(self, repo_name, data_df, input_features, output_features, input_days=60, output_days=7,
+                               **kwargs):
         scaler = MinMaxScaler(feature_range=(0, 1))
 
         n_input_steps = input_days
@@ -198,7 +199,7 @@ class Forecasting:
         values = sequence_data.values
         values = scaler.fit_transform(values)
 
-        train_test_ratio = 2/3
+        train_test_ratio = 2 / 3
         if 'train_test_ratio' in kwargs:
             train_test_ratio = kwargs['train_test_ratio'] if kwargs['train_test_ratio'] < 1 else train_test_ratio
 
@@ -286,28 +287,43 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(output_dir, "First_Day_Cumulative"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "Last_Day_Cumulative"), exist_ok=True)
 
-    f = Forecasting()
+    forecasting = Forecasting()
     db_service = DatabaseService()
-    for i in range(1, 28):
-        repo_name = db_service.get_repo_full_name_by_id(i)
-        repo_name = repo_name.replace("/", "_")
-        daily_repo_stats = DatabaseService().get_daily_repo_stats_by_day(i)
 
-        data_df = pandas.DataFrame(daily_repo_stats)
-        data_df.drop('repo_id', axis=1, inplace=True)
-        data_df['date'] = pandas.to_datetime(data_df['date'])
-        data_df.set_index("date", inplace=True)
+    categories = db_service.get_categories()
+    for category in categories:
+        repos_of_category = db_service.get_repos_of_category(category['id'])
+        for repo in repos_of_category:
+            repo_id = db_service.get_repo_id_by_name_and_owner(repo["owner"], repo["name"])
+            repo_name = repo['full_name'].replace("/", "_")
+            daily_repo_stats = DatabaseService().get_daily_repo_stats_by_day(repo_id)
 
-        input_features = data_df.columns
-        output_features = ['star_count']
+            data_df = pandas.DataFrame(daily_repo_stats)
+            data_df.drop('repo_id', axis=1, inplace=True)
+            data_df['date'] = pandas.to_datetime(data_df['date'])
+            data_df.set_index("date", inplace=True)
 
-        data_df = f.populate_non_existing_dates(data_df, columns=(input_features.union(output_features)))
+            # Possible set of input features
+            all_features = data_df.columns
+            weighted_features = pandas.Index(['star_count',
+                                              'weighted_closed_issue_count', 'weighted_commit_count',
+                                              'weighted_fork_count', 'weighted_opened_count',
+                                              'weighted_release_count', 'weighted_star_count'])
 
-        f.forecast_stars_of_repo(repo_name, data_df, input_features, output_features, input_days=60, output_days=7,
-                                 train_test_ratio=(2/3))
+            # Explicitly define which features should be used for input & output
+            input_features = all_features
+            output_features = ['star_count']
 
-        pandas.DataFrame(f.errors).to_csv("output/Errors.csv")
-        pandas.DataFrame(f.scaled_errors).to_csv("output/Scaled_Errors.csv")
-        pandas.DataFrame(f.errors_by_day).to_csv("output/Errors_By_Day.csv")
-        pandas.DataFrame(f.aggregated_relative_errors).to_csv("output/Aggregated_Relative_Errors.csv")
-        pandas.DataFrame(f.aggregated_absolute_errors).to_csv("output/Aggregated_Absolute_Errors.csv")
+            # Some dates might not have any records at all
+            # We should add those dates into data frame with 0 values
+            data_df = forecasting.populate_non_existing_dates(data_df, columns=(input_features.union(output_features)))
+
+            forecasting.forecast_stars_of_repo(repo_name, data_df, input_features, output_features, input_days=60,
+                                               output_days=7,
+                                               train_test_ratio=(2 / 3))
+
+            pandas.DataFrame(forecasting.errors).to_csv("output/Errors.csv")
+            pandas.DataFrame(forecasting.scaled_errors).to_csv("output/Scaled_Errors.csv")
+            pandas.DataFrame(forecasting.errors_by_day).to_csv("output/Errors_By_Day.csv")
+            pandas.DataFrame(forecasting.aggregated_relative_errors).to_csv("output/Aggregated_Relative_Errors.csv")
+            pandas.DataFrame(forecasting.aggregated_absolute_errors).to_csv("output/Aggregated_Absolute_Errors.csv")

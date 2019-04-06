@@ -1,3 +1,5 @@
+from datetime import date
+
 import csv
 import os
 from collections import defaultdict
@@ -14,5 +16,6 @@ with open(os.path.join(os.path.dirname(__file__), 'research_repos.csv'), 'r') as
         category_repos[row['category']].append(row)
 
 
-
+date_range_start = date(2014, 1, 1)
+date_range_end = date(2017, 12, 31)
 

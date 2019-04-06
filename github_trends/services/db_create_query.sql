@@ -1,5 +1,5 @@
 -- Created by Vertabelo (http://vertabelo.com)
--- Last modification date: 2017-11-14 19:16:25.289
+-- Last modification date: 2018-06-21 11:48:38.05
 
 -- tables
 -- Table: categories
@@ -30,6 +30,7 @@ CREATE TABLE commits (
 CREATE TABLE daily_developer_stats (
     id int NOT NULL AUTO_INCREMENT,
     login varchar(255) NOT NULL,
+    category_id int NOT NULL,
     date date NOT NULL,
     starred_repo_count int NULL DEFAULT 0,
     forked_repo_column int NULL DEFAULT 0,
@@ -196,6 +197,10 @@ ALTER TABLE daily_repo_contributions ADD CONSTRAINT Copy_of_daily_repo_stars_rep
 -- Reference: commits_repos (table: commits)
 ALTER TABLE commits ADD CONSTRAINT commits_repos FOREIGN KEY commits_repos (repo_id)
     REFERENCES repos (id);
+
+-- Reference: daily_developer_stats_categories (table: daily_developer_stats)
+ALTER TABLE daily_developer_stats ADD CONSTRAINT daily_developer_stats_categories FOREIGN KEY daily_developer_stats_categories (category_id)
+    REFERENCES categories (id);
 
 -- Reference: daily_repo_forks_repos (table: daily_repo_forks)
 ALTER TABLE daily_repo_forks ADD CONSTRAINT daily_repo_forks_repos FOREIGN KEY daily_repo_forks_repos (repo_id)

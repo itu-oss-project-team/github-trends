@@ -1,9 +1,11 @@
+from collections import defaultdict, OrderedDict
+
 import requests
 from datetime import datetime
-from collections import defaultdict, OrderedDict
 
 from github_trends import secret_config
 from github_trends.services.database_service import DatabaseService
+from github_trends.services.utils import parse_github_datetime
 
 
 class CommitFetcher:
@@ -67,7 +69,7 @@ class CommitFetcher:
         date_commit_dict = OrderedDict()
 
         for edge in commit_list:
-            date = datetime.strptime(edge["node"]["committedDate"], "%Y-%m-%dT%H:%M:%SZ").date()
+            date = parse_github_datetime(edge["node"]["committedDate"]).date()
 
             if date not in date_commit_dict:
                 date_commit_dict[date] = 1
@@ -81,7 +83,7 @@ class CommitFetcher:
         for edge in commit_list:
             try:
                 user_login = edge["node"]["author"]["user"]["login"]
-                date = datetime.strptime(edge["node"]["committedDate"], "%Y-%m-%dT%H:%M:%SZ").date()
+                date = parse_github_datetime(edge["node"]["committedDate"]).date()
 
                 contribution_dict[date][user_login] += 1
             except:
@@ -101,8 +103,10 @@ class CommitFetcher:
         date_user_contribution_dict = self.__get_users_and_contributions(commit_list)
 
         commit_list = list(map(lambda x:
-                        {"login": x["node"]["author"]["user"]["login"] if x["node"]["author"]["user"] is not None else None,
-                         "date": datetime.strptime(x["node"]["committedDate"], "%Y-%m-%dT%H:%M:%SZ").date()}, commit_list))
+                               {"login": x["node"]["author"]["user"]["login"] if x["node"]["author"][
+                                                                                     "user"] is not None else None,
+                                "date": datetime.strptime(x["node"]["committedDate"], "%Y-%m-%dT%H:%M:%SZ").date()},
+                               commit_list))
 
         self.db_service.save_commits(owner, name, commit_list)
         self.db_service.save_daily_commits_of_repo(owner, name, date_commit_dict)
@@ -110,4 +114,3 @@ class CommitFetcher:
 
         print("[" + str(datetime.now()) + "]: Calculating daily commits of repo " +
               owner + "/" + name + " ended.")
-

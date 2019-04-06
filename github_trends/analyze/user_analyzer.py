@@ -12,7 +12,9 @@ class UserFetcher:
     def __init__(self):
         self.db_service = db_service
 
-    def AnalyzeUser(self, user_login, date, category=None):
+    def AnalyzeUser(self, user_login, date, category_id):
+        repos_of_category = db_service.get_repos_of_category(category_id)
+        repo_ids_of_category = list(map(lambda repo : repo['id'], repos_of_category))
 
         commit_counts = self.db_service.get_cumulative_commits_of_a_user(user_login, date)
         opened_issue_counts = self.db_service.get_cumulative_opened_issues_of_a_user(user_login, date)
@@ -168,9 +170,12 @@ if __name__ == "__main__":
     uf = UserFetcher()
     developers = db_service.get_developers()
 
-    for developer in developers:
-        print("[" + str(datetime.now()) + "]: " + developer["login"])
-        uf.AnalyzeUser(developer["login"], datetime.now().date())
+    categories = db_service.get_categories()
+    for category in categories:
+
+        for developer in developers:
+            print("[" + str(datetime.now()) + "]: " + developer["login"])
+            uf.AnalyzeUser(developer["login"], datetime.now().date(), category['id'])
 
     uf.CalculateScoreForAllUsers()
 

@@ -180,10 +180,24 @@ class DatabaseService:
 
         return developers
 
+    def get_categories(self):
+        query = ''' SELECT * FROM categories '''
+
+        categories = self.execute_select_query(query, None)
+
+        return categories
+
     def get_repos(self):
         query = ''' SELECT * FROM repos '''
 
         repos = self.execute_select_query(query, None)
+
+        return repos
+
+    def get_repos_of_category(self, category_id):
+        query = ''' SELECT * FROM repos WHERE id in (SELECT id FROM category_repos WHERE category_id = %s)'''
+
+        repos = self.execute_select_query(query, category_id)
 
         return repos
 
@@ -236,15 +250,17 @@ class DatabaseService:
 
         self.__executemany_insert_query(query, release_tuple_list)
 
-    def get_cumulative_commits_of_a_user(self, login, date):
-        query = '''
+    def get_cumulative_commits_of_a_user(self, login, date, repo_ids):
+        placeholders = ','.join(['%s'] * len(repo_ids))
+        query = """
             SELECT DISTINCT 
             C.date, 
             (SELECT count(*) FROM commits innerC WHERE innerC.date <= C.date AND innerC.login = C.login) AS NumberOfCommits
             FROM `commits` C
-            WHERE login = %s AND C.date <= %s
+            WHERE login = %s AND repo_id IN ({}) AND C.date <= %s
             ORDER BY C.date DESC
-                '''
+                """
+        query.format(placeholders)
 
         commit_list = self.execute_select_query(query, (login, date))
         commit_dict = OrderedDict(map(lambda x: (x["date"], x["NumberOfCommits"]), commit_list))
